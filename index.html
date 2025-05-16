@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://www.unpkg.com/olamaps-web-sdk@latest/dist/olamaps-web-sdk.umd.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      #map {
+        width: 50%;
+        height: 50vh;
+      }
+    </style>
+    <title>Ola Maps Demo</title>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+            const olaMaps = new OlaMaps({
+              apiKey: "FQ0qoSybPvLTGd7UbMfrXNgxe0LJDkiK3CcTubL4",
+            });
+
+            const myMap = olaMaps.init({
+              style:
+                "https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard/style.json",
+              container: "map",
+              center: [77.61648476788898, 12.931423492103944],
+              zoom: 15,
+            });
+            const marker = olaMaps
+              .addMarker({
+                offset: [0, -20],
+                anchor: "bottom",
+                color: "pink",
+                draggable: true,
+              }) // optional styling
+              .setLngLat([77.61648476788898, 12.931423492103944]) // marker position
+              .addTo(myMap); // map pe add karo
+
+            // 2. Info window add karna hai? Toh yeh use karo:
+            const popup = olaMaps
+              .addPopup({ offset: 25 }) // popup box ka offset
+              .setHTML("<h3>My Location</h3><p>This is a test marker!</p>");
+
+            marker.setPopup(popup);
+            const geolocate = olaMaps.addGeolocateControls({
+              positionOptions: {
+                enableHighAccuracy: true,
+              },
+              trackUserLocation: true,
+            });
+
+            myMap.addControl(geolocate);
+            // myMap.getContainer().addEventListener("geolocate", (e) => {
+            //   console.log("A geolocate event has occurred");
+            //   const { latitude, longitude } = e.detail.coords;
+            //   console.log("Latitude:", latitude, "Longitude:", longitude);
+            // });
+            // geolocate.on("geolocate", (event) => {
+            //   console.log("A geolocate event has occurred", event); // logs the full object
+            // });
+            // geolocate.on("error", (event) => {
+            //   console.log("An error event has occurred.", event);
+            // });
+            // geolocate.on("trackuserlocationend", () => {
+            //   console.log("User location tracking has ended.");
+            // });
+            // geolocate.on("userlocationfocus", () => {
+            //   myMap.setZoom(17); // zoom in when user is focused
+            //   console.log("Map centered on user.");
+            // });
+
+            // myMap.on("load", () => {
+            //   geolocate.trigger();
+            // });
+            myMap.on('load', () => {
+        myMap.addSource([POLYLINE ID], {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: [ADD YOUR COORDINATES HERE],
+            },
+          },
+        })
+        myMap.addLayer({
+          id: [POLYLINE ID],
+          type: 'line',
+          source: [POLYLINE ID],
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color': [ADD LINE COLOR],
+            'line-width': [ADD LINE WIDTH],
+          },
+        })
+      })
+    </script>
+  </body>
+</html>
