@@ -1,5 +1,6 @@
 import React from "react";
 import { useState, useEffect } from "react";
+import "./App.css";
 import {
   Plus,
   MapPin,
@@ -58,6 +59,7 @@ interface Donation {
 
 export default function App() {
   const [donations, setDonations] = useState<Donation[]>([]);
+  const [isHovered, setIsHovered] = useState(false);
   const [showDonationForm, setShowDonationForm] = useState(false);
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
   const [searchTerm, setSearchTerm] = useState("");
@@ -173,30 +175,56 @@ export default function App() {
     }
   };
 
-  const handleSubmitDonation = (e: React.FormEvent) => {
+  const handleSubmitDonation = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would submit to your API
-    const newDonation: Donation = {
-      id: Math.random().toString(36).substring(2, 9),
-      foodType: formData.foodType,
-      quantity: formData.quantity,
-      pickupDate: formData.pickupDate,
-      expiryDate: formData.expiryDate,
-      location: formData.location,
-      status: "available",
-      createdAt: new Date().toISOString(),
-    };
-    setDonations((prev) => [newDonation, ...prev]);
-    setFormData({
-      foodType: "",
-      quantity: "",
-      pickupDate: "",
-      expiryDate: "",
-      location: "",
-      notes: "",
-      photo: null,
-    });
-    setShowDonationForm(false);
+
+    const formPayload = new FormData();
+    formPayload.append("foodType", formData.foodType);
+    formPayload.append("quantity", formData.quantity);
+    formPayload.append("pickupDate", formData.pickupDate);
+    formPayload.append("expiryDate", formData.expiryDate);
+    formPayload.append("location", formData.location);
+    formPayload.append("notes", formData.notes || "");
+    if (formData.photo) {
+      formPayload.append("photo", formData.photo);
+    }
+
+    try {
+      const res = await fetch("/api/donations", {
+        method: "POST",
+        body: formPayload,
+      });
+
+      if (!res.ok) throw new Error("Failed to post donation");
+
+      const savedDonation = await res.json();
+
+      const newDonation: Donation = {
+        id: savedDonation.id || Math.random().toString(36).substring(2, 9),
+        foodType: formData.foodType,
+        quantity: formData.quantity,
+        pickupDate: formData.pickupDate,
+        expiryDate: formData.expiryDate,
+        location: formData.location,
+        status: "available",
+        createdAt: new Date().toISOString(),
+      };
+
+      setDonations((prev) => [newDonation, ...prev]);
+      setFormData({
+        foodType: "",
+        quantity: "",
+        pickupDate: "",
+        expiryDate: "",
+        location: "",
+        notes: "",
+        photo: null,
+      });
+      setShowDonationForm(false);
+    } catch (err) {
+      console.error("Error posting donation:", err);
+      // Optional: show toast
+    }
   };
 
   const handleCancelDonation = (id: string) => {
@@ -251,14 +279,29 @@ export default function App() {
   ).length;
 
   const foodTypes = Array.from(new Set(donations.map((d) => d.foodType)));
+  const isDarkMode =
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-      <header className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold mb-2">
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#f9fafb",
+        padding: "1rem",
+      }}
+    >
+      <header style={{ marginBottom: "1.5rem" }}>
+        <h1
+          style={{
+            fontSize: "1.5rem",
+            fontWeight: "bold",
+            marginBottom: "0.5rem",
+          }}
+        >
           Your Food Donations
         </h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p style={{ color: isDarkMode ? "#9CA3AF" : "#4B5563" }}>
           Help reduce food waste by sharing surplus meals
         </p>
       </header>
@@ -302,19 +345,45 @@ export default function App() {
         defaultValue="active"
         onValueChange={(value) => setActiveTab(value as "active" | "history")}
       >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <TabsList>
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            marginBottom: "1rem",
+          }}
+        >
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <TabsList>
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+            </TabsList>
+          </div>
 
-          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+              width: "100%",
+            }}
+          >
+            <div style={{ position: "relative", flex: 1 }}>
+              <Search
+                style={{
+                  position: "absolute",
+                  left: "0.75rem",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  height: "1rem",
+                  width: "1rem",
+                  color: "#9CA3AF", // Tailwind gray-400
+                }}
+              />
               <Input
                 type="text"
                 placeholder="Search donations..."
-                className="pl-10"
+                style={{ paddingLeft: "2.5rem", width: "100%" }}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -325,22 +394,61 @@ export default function App() {
                 setSelectedDonation(null);
                 setShowDonationForm(true);
               }}
-              className="bg-green-600 hover:bg-green-700"
+              style={{
+                backgroundColor: "#16A34A", // Tailwind green-600
+                color: "white",
+                padding: "0.5rem 1rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                borderRadius: "0.375rem",
+                border: "none",
+                cursor: "pointer",
+                transition: "background-color 0.2s ease",
+              }}
+              onMouseOver={
+                (e) => (e.currentTarget.style.backgroundColor = "#15803D") // Tailwind green-700
+              }
+              onMouseOut={
+                (e) => (e.currentTarget.style.backgroundColor = "#16A34A") // Reset
+              }
             >
-              <Plus className="h-4 w-4 mr-2" /> New Donation
+              <Plus
+                style={{ height: "1rem", width: "1rem", marginRight: "0.5rem" }}
+              />
+              New Donation
             </Button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div
+          style={{
+            marginBottom: "1rem",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+          }}
+        >
           <Select
             value={filters.status}
             onValueChange={(value) => setFilters({ ...filters, status: value })}
           >
-            <SelectTrigger className="w-[180px]">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
+            <SelectTrigger
+              style={{
+                width: "180px",
+                display: "flex",
+                alignItems: "center",
+                padding: "0.5rem",
+                border: "1px solid #ccc",
+                borderRadius: "0.375rem",
+                backgroundColor: "white",
+                cursor: "pointer",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+              >
+                <Filter style={{ height: "1rem", width: "1rem" }} />
                 <span>
                   Status: {filters.status === "all" ? "All" : filters.status}
                 </span>
@@ -361,9 +469,22 @@ export default function App() {
               setFilters({ ...filters, foodType: value })
             }
           >
-            <SelectTrigger className="w-[180px]">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
+            <SelectTrigger
+              style={{
+                width: "180px",
+                display: "flex",
+                alignItems: "center",
+                padding: "0.5rem",
+                border: "1px solid #ccc",
+                borderRadius: "0.375rem",
+                backgroundColor: "white",
+                cursor: "pointer",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+              >
+                <Filter style={{ height: "1rem", width: "1rem" }} />
                 <span>
                   Type: {filters.foodType === "all" ? "All" : filters.foodType}
                 </span>
@@ -387,19 +508,40 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+              style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1rem",
+                zIndex: 50,
+              }}
               onClick={() => setShowDonationForm(false)}
             >
               <motion.div
                 initial={{ y: 20 }}
                 animate={{ y: 0 }}
                 exit={{ y: -20 }}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md"
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "0.5rem",
+                  boxShadow: "0 10px 25px rgba(0, 0, 0, 0.1)",
+                  width: "100%",
+                  maxWidth: "28rem",
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
                       <CardTitle>
                         {selectedDonation
                           ? "Edit Donation"
@@ -410,7 +552,7 @@ export default function App() {
                         size="sm"
                         onClick={() => setShowDonationForm(false)}
                       >
-                        <X className="h-4 w-4" />
+                        <X style={{ height: "1rem", width: "1rem" }} />
                       </Button>
                     </div>
                   </CardHeader>
@@ -422,7 +564,13 @@ export default function App() {
                           : handleSubmitDonation
                       }
                     >
-                      <div className="space-y-4">
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "1rem",
+                        }}
+                      >
                         <div>
                           <Label htmlFor="foodType">Food Type</Label>
                           <Input
@@ -446,7 +594,13 @@ export default function App() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "1rem",
+                          }}
+                        >
                           <div>
                             <Label htmlFor="pickupDate">Pickup Date/Time</Label>
                             <Input
@@ -473,7 +627,7 @@ export default function App() {
 
                         <div>
                           <Label htmlFor="location">Location</Label>
-                          <div className="flex gap-2">
+                          <div style={{ display: "flex", gap: "0.5rem" }}>
                             <Input
                               id="location"
                               name="location"
@@ -482,7 +636,14 @@ export default function App() {
                               required
                             />
                             <Button variant="outline" type="button">
-                              <MapPin className="h-4 w-4 mr-2" /> Detect
+                              <MapPin
+                                style={{
+                                  height: "1rem",
+                                  width: "1rem",
+                                  marginRight: "0.5rem",
+                                }}
+                              />{" "}
+                              Detect
                             </Button>
                           </div>
                         </div>
@@ -505,16 +666,24 @@ export default function App() {
                             type="file"
                             accept="image/*"
                             onChange={handleFileChange}
-                            className="block w-full text-sm text-gray-500
-                              file:mr-4 file:py-2 file:px-4
-                              file:rounded-md file:border-0
-                              file:text-sm file:font-semibold
-                              file:bg-green-50 file:text-green-700
-                              hover:file:bg-green-100"
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              fontSize: "0.875rem",
+                              color: "#6b7280",
+                            }}
+                            className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
                           />
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-2">
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            gap: "0.5rem",
+                            paddingTop: "0.5rem",
+                          }}
+                        >
                           <Button
                             variant="outline"
                             type="button"
@@ -524,7 +693,19 @@ export default function App() {
                           </Button>
                           <Button
                             type="submit"
-                            className="bg-green-600 hover:bg-green-700"
+                            style={{
+                              backgroundColor: isHovered
+                                ? "#15803d"
+                                : "#16a34a",
+                              color: "white",
+                              padding: "0.5rem 1rem",
+                              border: "none",
+                              borderRadius: "0.375rem",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={() => setIsHovered(true)}
+                            onMouseLeave={() => setIsHovered(false)}
+                            // onClick={() => handleSubmitDonation}
                           >
                             {selectedDonation
                               ? "Update Donation"
@@ -544,21 +725,70 @@ export default function App() {
         <TabsContent value="active">
           {filteredDonations.length === 0 ? (
             <Card>
-              <CardContent className="py-12 px-4 text-center">
-                <div className="mx-auto max-w-md">
-                  <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-1">
+              <CardContent
+                style={{
+                  paddingTop: "3rem",
+                  paddingBottom: "3rem",
+                  paddingLeft: "1rem",
+                  paddingRight: "1rem",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ maxWidth: "28rem", margin: "0 auto" }}>
+                  <Calendar
+                    style={{
+                      height: "3rem",
+                      width: "3rem",
+                      margin: "0 auto",
+                      color: "#9ca3af", // Tailwind's gray-400
+                      marginBottom: "1rem",
+                    }}
+                  />
+                  <h3
+                    style={{
+                      fontSize: "1.125rem", // Tailwind's text-lg
+                      fontWeight: 500,
+                      marginBottom: "0.25rem",
+                    }}
+                  >
                     No active donations
                   </h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                  <p
+                    style={{
+                      color: "#6b7280", // Tailwind's gray-500
+                      marginBottom: "1rem",
+                    }}
+                  >
                     Start by adding a new food donation
                   </p>
-                  <Button
+                  <button
                     onClick={() => setShowDonationForm(true)}
-                    className="bg-green-600 hover:bg-green-700"
+                    style={{
+                      backgroundColor: "#16a34a", // green-600
+                      color: "white",
+                      padding: "0.5rem 1rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      borderRadius: "0.375rem",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = "#15803d")
+                    } // green-700
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "#16a34a")
+                    }
                   >
-                    <Plus className="h-4 w-4 mr-2" /> New Donation
-                  </Button>
+                    <Plus
+                      style={{
+                        height: "1rem",
+                        width: "1rem",
+                        marginRight: "0.5rem",
+                      }}
+                    />
+                    New Donation
+                  </button>
                 </div>
               </CardContent>
             </Card>
@@ -567,12 +797,27 @@ export default function App() {
               {filteredDonations.map((donation) => (
                 <Card key={donation.id}>
                   <CardHeader>
-                    <div className="flex justify-between items-start">
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
                       <div>
                         <CardTitle>{donation.foodType}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {donation.location}
+                        <CardDescription>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                              marginTop: "0.25rem",
+                            }}
+                          >
+                            <MapPin style={{ height: "1rem", width: "1rem" }} />
+                            {donation.location}
+                          </div>
                         </CardDescription>
                       </div>
                       <Badge
@@ -585,25 +830,38 @@ export default function App() {
                             ? "outline"
                             : "destructive"
                         }
-                        className="capitalize"
+                        style={{ textTransform: "capitalize" }}
                       >
                         {donation.status}
                       </Badge>
                     </div>
                   </CardHeader>
+
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, 1fr)",
+                        gap: "1rem",
+                        // Optional responsive handling can be done in JS if needed
+                      }}
+                    >
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p
+                          style={{
+                            fontSize: "0.875rem",
+                            color: "#6B7280" /* gray-500 */,
+                          }}
+                        >
                           Quantity
                         </p>
-                        <p className="font-medium">{donation.quantity}</p>
+                        <p style={{ fontWeight: 500 }}>{donation.quantity}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p style={{ fontSize: "0.875rem", color: "#6B7280" }}>
                           Pickup By
                         </p>
-                        <p className="font-medium">
+                        <p style={{ fontWeight: 500 }}>
                           {new Date(donation.pickupDate).toLocaleString([], {
                             month: "short",
                             day: "numeric",
@@ -613,10 +871,10 @@ export default function App() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p style={{ fontSize: "0.875rem", color: "#6B7280" }}>
                           Expires
                         </p>
-                        <p className="font-medium">
+                        <p style={{ fontWeight: 500 }}>
                           {new Date(donation.expiryDate).toLocaleDateString(
                             [],
                             {
@@ -627,30 +885,50 @@ export default function App() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p style={{ fontSize: "0.875rem", color: "#6B7280" }}>
                           Claimed By
                         </p>
-                        <p className="font-medium">
+                        <p style={{ fontWeight: 500 }}>
                           {donation.claimedBy || "Not claimed"}
                         </p>
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="flex justify-between gap-2 border-t pt-4">
-                    <div className="space-x-2">
+
+                  <CardFooter
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "0.5rem",
+                      borderTop: "1px solid #E5E7EB", // Tailwind's border-gray-200
+                      paddingTop: "1rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditDonation(donation)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
                       >
-                        <Edit className="h-4 w-4 mr-2" /> Edit
+                        <Edit style={{ height: "1rem", width: "1rem" }} /> Edit
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setShowMap(true)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
                       >
-                        <MapPin className="h-4 w-4 mr-2" /> View Map
+                        <MapPin style={{ height: "1rem", width: "1rem" }} />{" "}
+                        View Map
                       </Button>
                     </div>
                     {donation.status === "available" && (
@@ -658,8 +936,14 @@ export default function App() {
                         variant="destructive"
                         size="sm"
                         onClick={() => handleCancelDonation(donation.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" /> Cancel
+                        <Trash2 style={{ height: "1rem", width: "1rem" }} />{" "}
+                        Cancel
                       </Button>
                     )}
                   </CardFooter>
@@ -672,28 +956,76 @@ export default function App() {
         <TabsContent value="history">
           {filteredDonations.length === 0 ? (
             <Card>
-              <CardContent className="py-12 px-4 text-center">
-                <div className="mx-auto max-w-md">
-                  <Clock className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-1">
+              <CardContent
+                style={{
+                  paddingTop: "3rem",
+                  paddingBottom: "3rem",
+                  paddingLeft: "1rem",
+                  paddingRight: "1rem",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    marginLeft: "auto",
+                    marginRight: "auto",
+                    maxWidth: "28rem", // 448px (Tailwind's max-w-md)
+                  }}
+                >
+                  <Clock
+                    style={{
+                      height: "3rem",
+                      width: "3rem",
+                      marginLeft: "auto",
+                      marginRight: "auto",
+                      color: "#9CA3AF", // Tailwind's text-gray-400
+                      marginBottom: "1rem",
+                    }}
+                  />
+                  <h3
+                    style={{
+                      fontSize: "1.125rem", // text-lg
+                      fontWeight: "500", // font-medium
+                      marginBottom: "0.25rem",
+                    }}
+                  >
                     No donation history
                   </h3>
-                  <p className="text-gray-500 dark:text-gray-400">
+                  <p
+                    style={{
+                      color: "#6B7280", // Tailwind's text-gray-500
+                    }}
+                  >
                     Your past donations will appear here
                   </p>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+            >
               {filteredDonations.map((donation) => (
                 <Card key={donation.id}>
                   <CardHeader>
-                    <div className="flex justify-between items-start">
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
                       <div>
                         <CardTitle>{donation.foodType}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-1">
-                          <MapPin className="h-4 w-4" />
+                        <CardDescription
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            marginTop: "0.25rem",
+                          }}
+                        >
+                          <MapPin style={{ height: "1rem", width: "1rem" }} />
                           {donation.location}
                         </CardDescription>
                       </div>
@@ -703,25 +1035,45 @@ export default function App() {
                             ? "outline"
                             : "destructive"
                         }
-                        className="capitalize"
+                        style={{ textTransform: "capitalize" }}
                       >
                         {donation.status}
                       </Badge>
                     </div>
                   </CardHeader>
+
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, 1fr)",
+                        gap: "1rem",
+                        // Responsive: change to 4 cols on wider screens
+                        // This requires media queries in CSS; inline styles can't handle media queries directly.
+                      }}
+                    >
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p
+                          style={{
+                            fontSize: "0.875rem",
+                            color: "#6B7280", // gray-500
+                          }}
+                        >
                           Quantity
                         </p>
-                        <p className="font-medium">{donation.quantity}</p>
+                        <p style={{ fontWeight: "500" }}>{donation.quantity}</p>
                       </div>
+
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p
+                          style={{
+                            fontSize: "0.875rem",
+                            color: "#6B7280",
+                          }}
+                        >
                           Pickup Date
                         </p>
-                        <p className="font-medium">
+                        <p style={{ fontWeight: "500" }}>
                           {new Date(donation.pickupDate).toLocaleDateString(
                             [],
                             {
@@ -731,19 +1083,31 @@ export default function App() {
                           )}
                         </p>
                       </div>
+
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p
+                          style={{
+                            fontSize: "0.875rem",
+                            color: "#6B7280",
+                          }}
+                        >
                           Claimed By
                         </p>
-                        <p className="font-medium">
+                        <p style={{ fontWeight: "500" }}>
                           {donation.claimedBy || "Not claimed"}
                         </p>
                       </div>
+
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p
+                          style={{
+                            fontSize: "0.875rem",
+                            color: "#6B7280",
+                          }}
+                        >
                           Donated On
                         </p>
-                        <p className="font-medium">
+                        <p style={{ fontWeight: "500" }}>
                           {new Date(donation.createdAt).toLocaleDateString([], {
                             month: "short",
                             day: "numeric",
@@ -766,50 +1130,162 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
             onClick={() => setShowMap(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "1rem",
+              zIndex: 50,
+            }}
           >
             <motion.div
               initial={{ y: 20 }}
               animate={{ y: 0 }}
               exit={{ y: -20 }}
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl h-[80vh]"
               onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: "white",
+                borderRadius: "0.5rem",
+                boxShadow:
+                  "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+                width: "100%",
+                maxWidth: "64rem", // max-w-4xl = 64rem (1024px)
+                height: "80vh",
+                color: "#1f2937", // dark mode bg-gray-800 won't apply inline, so choose light bg color
+                display: "flex",
+                flexDirection: "column",
+              }}
             >
-              <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="text-lg font-medium">Pickup Location</h3>
+              <div
+                style={{
+                  padding: "1rem",
+                  borderBottom: "1px solid #e5e7eb", // gray-200 border
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 500 }}>
+                  Pickup Location
+                </h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowMap(false)}
                 >
-                  <X className="h-4 w-4" />
+                  <X style={{ height: "1rem", width: "1rem" }} />
                 </Button>
               </div>
-              <div className="h-[calc(100%-56px)] relative">
-                {/* Map placeholder - replace with actual Mapbox/Google Maps implementation */}
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                  <div className="text-center">
-                    <MapPin className="h-12 w-12 mx-auto text-gray-500 mb-4" />
-                    <p className="font-medium">Map View</p>
-                    <p className="text-sm text-gray-500">
-                      Showing route to pickup location
-                    </p>
 
-                    {/* Map markers simulation */}
-                    <div className="relative mt-8 h-32 w-full">
-                      <div className="absolute left-8 top-1/2 w-8 h-8 bg-blue-500 rounded-full transform -translate-y-1/2 flex items-center justify-center text-white">
-                        <span>You</span>
-                      </div>
-                      <div className="absolute right-8 top-1/2 w-8 h-8 bg-green-500 rounded-full transform -translate-y-1/2 flex items-center justify-center text-white">
-                        <span>Pickup</span>
-                      </div>
-                      <div className="absolute left-8 right-8 top-1/2 h-1 bg-gray-400 transform -translate-y-1/2"></div>
-                      <div
-                        className="absolute left-8 h-1 bg-green-500 transform -translate-y-1/2"
-                        style={{ width: "60%" }}
-                      ></div>
+              <div
+                style={{
+                  height: "calc(100% - 56px)",
+                  position: "relative",
+                  flexGrow: 1,
+                }}
+              >
+                {/* Map placeholder */}
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "#e5e7eb", // bg-gray-200
+                    flexDirection: "column",
+                    textAlign: "center",
+                    padding: "1rem",
+                  }}
+                >
+                  <MapPin
+                    style={{
+                      height: "3rem",
+                      width: "3rem",
+                      margin: "0 auto 1rem auto",
+                      color: "#6b7280", // text-gray-500
+                    }}
+                  />
+                  <p style={{ fontWeight: 500, marginBottom: "0.25rem" }}>
+                    Map View
+                  </p>
+                  <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+                    Showing route to pickup location
+                  </p>
+
+                  {/* Map markers simulation */}
+                  <div
+                    style={{
+                      position: "relative",
+                      marginTop: "2rem",
+                      height: "8rem",
+                      width: "100%",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "2rem",
+                        top: "50%",
+                        width: "2rem",
+                        height: "2rem",
+                        backgroundColor: "#3b82f6", // blue-500
+                        borderRadius: "9999px",
+                        transform: "translateY(-50%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontSize: "0.75rem",
+                      }}
+                    >
+                      You
                     </div>
+                    <div
+                      style={{
+                        position: "absolute",
+                        right: "2rem",
+                        top: "50%",
+                        width: "2rem",
+                        height: "2rem",
+                        backgroundColor: "#22c55e", // green-500
+                        borderRadius: "9999px",
+                        transform: "translateY(-50%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontSize: "0.75rem",
+                      }}
+                    >
+                      Pickup
+                    </div>
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "2rem",
+                        right: "2rem",
+                        top: "50%",
+                        height: "0.25rem",
+                        backgroundColor: "#9ca3af", // gray-400
+                        transform: "translateY(-50%)",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "2rem",
+                        top: "50%",
+                        height: "0.25rem",
+                        backgroundColor: "#22c55e", // green-500
+                        transform: "translateY(-50%)",
+                        width: "60%",
+                      }}
+                    />
                   </div>
                 </div>
               </div>
