@@ -1,409 +1,288 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   Star,
-  Check,
-  Clock,
-  Utensils,
-  MapPin,
-  AlertTriangle,
+  Send,
+  MessageSquare,
   ThumbsUp,
-  ThumbsDown,
+  AlertTriangle,
 } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { submitRating, fetchMyRequests } from "../../store/slices/requestsSlice";
+import { addToast } from "../../store/slices/uiSlice";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
-type Pickup = {
-  id: number;
-  donorName: string;
-  donorAvatar: string;
-  address: string;
-  date: string;
-  foodDetails: string;
-  rating: number;
-  feedback: string;
-  submitted: boolean;
-  editable: boolean;
-};
+const Feedback: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const { myRequests, isLoading } = useAppSelector((state) => state.requests);
+  const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState("");
+  const [feedbackType, setFeedbackType] = useState<"positive" | "issue" | null>(null);
 
-const pastPickups: Pickup[] = [
-  {
-    id: 1,
-    donorName: "Green Bistro",
-    donorAvatar: "GB",
-    address: "123 Main St",
-    date: "Today, 2:30 PM",
-    foodDetails: "Vegetable Curry – 12 Meals",
-    rating: 0,
-    feedback: "",
-    submitted: false,
-    editable: true,
-  },
-  {
-    id: 2,
-    donorName: "Urban Bakery",
-    donorAvatar: "UB",
-    address: "456 Oak Ave",
-    date: "Yesterday, 4:15 PM",
-    foodDetails: "Assorted Pastries – 8kg",
-    rating: 5,
-    feedback: "Food was fresh and well-packaged. Very professional!",
-    submitted: true,
-    editable: true,
-  },
-  {
-    id: 3,
-    donorName: "Fresh Market",
-    donorAvatar: "FM",
-    address: "789 Pine Rd",
-    date: "Jun 12, 3:45 PM",
-    foodDetails: "Mixed Fruits – 15kg",
-    rating: 4,
-    feedback: "Good quality produce, though some items were overripe",
-    submitted: true,
-    editable: false,
-  },
-];
+  useEffect(() => {
+    dispatch(fetchMyRequests({ status: "delivered" }));
+  }, [dispatch]);
 
-export default function FeedbackScreen() {
-  const [pickups, setPickups] = useState<Pickup[]>(pastPickups);
-  const [activeTab, setActiveTab] = useState<"pending" | "submitted">(
-    "pending"
+  const completedRequests = myRequests.filter(
+    (r: any) => r.status === "delivered" && !r.volunteerRating
   );
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [currentReport, setCurrentReport] = useState<number | null>(null);
 
-  const submittedFeedbacks = pickups.filter((p) => p.submitted && p.rating > 0);
-  const averageRating =
-    submittedFeedbacks.length > 0
-      ? (
-          submittedFeedbacks.reduce((sum, p) => sum + p.rating, 0) /
-          submittedFeedbacks.length
-        ).toFixed(1)
-      : "0";
+  const handleSubmitRating = async () => {
+    if (!selectedRequest || !rating) {
+      dispatch(
+        addToast({
+          type: "error",
+          title: "Please select a rating",
+        })
+      );
+      return;
+    }
 
-  const commonTags = [
-    { text: "Fresh food", count: 12 },
-    { text: "Well packaged", count: 8 },
-    { text: "Friendly staff", count: 6 },
-    { text: "On time", count: 5 },
-    { text: "Good quantity", count: 4 },
+    const result = await dispatch(
+      submitRating({
+        requestId: selectedRequest,
+        rating,
+        feedback,
+      })
+    );
+
+    if (submitRating.fulfilled.match(result)) {
+      dispatch(
+        addToast({
+          type: "success",
+          title: "Feedback submitted!",
+          message: "Thank you for your feedback",
+        })
+      );
+      setSelectedRequest(null);
+      setRating(0);
+      setFeedback("");
+      setFeedbackType(null);
+    }
+  };
+
+  const quickFeedback = [
+    { label: "Great food quality", icon: ThumbsUp },
+    { label: "Easy pickup", icon: ThumbsUp },
+    { label: "Friendly donor", icon: ThumbsUp },
+    { label: "Food was not as described", icon: AlertTriangle },
+    { label: "Pickup location unclear", icon: AlertTriangle },
+    { label: "Donor was unavailable", icon: AlertTriangle },
   ];
 
-  const handleRatingChange = (id: number, rating: number) => {
-    setPickups(pickups.map((p) => (p.id === id ? { ...p, rating } : p)));
-  };
-
-  const handleFeedbackChange = (id: number, text: string) => {
-    setPickups(
-      pickups.map((p) => (p.id === id ? { ...p, feedback: text } : p))
-    );
-  };
-
-  const submitFeedback = (id: number) => {
-    setPickups(
-      pickups.map((p) => (p.id === id ? { ...p, submitted: true } : p))
-    );
-  };
-
-  const openReportModal = (id: number) => {
-    setCurrentReport(id);
-    setShowReportModal(true);
-  };
-
-  const filteredPickups = pickups.filter((p) =>
-    activeTab === "pending" ? !p.submitted : p.submitted
-  );
-
   return (
-    <div
-      className="min-vh-100 bg-light p-4"
-      style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
-    >
-      <div className="container max-w-900px">
-        {/* Header */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-          <h1 className="h2 mb-3 mb-md-0">Pickup Feedback</h1>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 pt-12 pb-6">
+        <h1 className="text-2xl font-bold mb-2">Feedback</h1>
+        <p className="text-green-100">
+          Help improve the community with your feedback
+        </p>
+      </div>
 
-          {/* Tabs */}
-          <div className="btn-group" role="group" aria-label="Tabs">
-            <button
-              type="button"
-              className={`btn btn-${
-                activeTab === "pending" ? "primary" : "outline-primary"
-              } d-flex align-items-center`}
-              onClick={() => setActiveTab("pending")}
-            >
-              <Clock size={16} className="me-1" />
-              Pending ({pickups.filter((p) => !p.submitted).length})
-            </button>
-            <button
-              type="button"
-              className={`btn btn-${
-                activeTab === "submitted" ? "primary" : "outline-primary"
-              } d-flex align-items-center`}
-              onClick={() => setActiveTab("submitted")}
-            >
-              <Check size={16} className="me-1" />
-              Submitted ({pickups.filter((p) => p.submitted).length})
-            </button>
-          </div>
-        </div>
-
-        {/* Summary Section */}
-        <div className="card mb-5 shadow-sm">
-          <div className="card-header">
-            <h5 className="mb-0">Feedback Summary</h5>
-          </div>
-          <div className="card-body">
-            <div className="row text-center text-md-start">
-              {/* Average Rating */}
-              <div className="col-md-4 d-flex align-items-center justify-content-center justify-content-md-start mb-4 mb-md-0">
-                <div
-                  className="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3"
-                  style={{ width: 72, height: 72 }}
+      <div className="px-4 -mt-4 space-y-6">
+        {/* Pending Reviews */}
+        {completedRequests.length > 0 && (
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-500" />
+                Pending Reviews ({completedRequests.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {completedRequests.map((request: any) => (
+                <motion.div
+                  key={request._id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className={`p-4 rounded-xl cursor-pointer transition-all ${
+                    selectedRequest === request._id
+                      ? "bg-green-50 border-2 border-green-500"
+                      : "bg-gray-50 hover:bg-gray-100"
+                  }`}
+                  onClick={() => setSelectedRequest(request._id)}
                 >
-                  <div
-                    className="text-success fw-bold fs-2 d-flex align-items-center"
-                    style={{ gap: 4 }}
-                  >
-                    {averageRating}
-                    <Star size={24} className="text-warning" />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        {request.donationId?.foodName}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {request.donationId?.donorId?.name}
+                      </p>
+                    </div>
+                    {selectedRequest === request._id && (
+                      <span className="text-green-600 text-sm">Selected</span>
+                    )}
                   </div>
-                </div>
-                <div>
-                  <p className="text-muted mb-0">Average Rating</p>
-                  <p className="fw-semibold mb-0">
-                    from {submittedFeedbacks.length}{" "}
-                    {submittedFeedbacks.length === 1 ? "pickup" : "pickups"}
-                  </p>
-                </div>
-              </div>
+                </motion.div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
-              {/* Common Feedback */}
-              <div className="col-md-8 text-start">
-                <p className="text-muted mb-2">Most Common Feedback</p>
-                <div className="d-flex flex-wrap gap-2">
-                  {commonTags.map((tag, i) => (
-                    <span
-                      key={i}
-                      className="badge bg-success bg-opacity-25 text-success py-1 px-3 rounded-pill"
+        {/* Rating Section */}
+        {selectedRequest && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle>Rate Your Experience</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Star Rating */}
+                <div className="flex justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setRating(star)}
+                      className="p-1 transition-transform hover:scale-110"
                     >
-                      {tag.text}{" "}
-                      <span className="opacity-75">({tag.count})</span>
-                    </span>
+                      <Star
+                        className={`w-10 h-10 ${
+                          star <= rating
+                            ? "text-yellow-400 fill-yellow-400"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Feedback Cards */}
-        {filteredPickups.length > 0 ? (
-          filteredPickups.map((pickup) => (
-            <div
-              key={pickup.id}
-              className="card mb-4 shadow-sm"
-              style={{ transition: "box-shadow 0.3s ease" }}
-            >
-              <div className="card-body">
-                <div className="d-flex mb-3">
-                  <div
-                    className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-3"
-                    style={{ width: 48, height: 48, fontWeight: "bold" }}
-                    title={pickup.donorName}
-                  >
-                    {pickup.donorAvatar}
-                  </div>
-                  <div>
-                    <h5 className="mb-1">{pickup.donorName}</h5>
-                    <p className="text-muted mb-1 d-flex align-items-center">
-                      <MapPin size={16} className="me-1" />
-                      {pickup.address}
-                    </p>
-                    <p className="text-muted d-flex align-items-center">
-                      <Clock size={16} className="me-1" />
-                      {pickup.date}
-                    </p>
-                  </div>
-                </div>
+                <p className="text-center text-gray-500">
+                  {rating === 0 && "Tap to rate"}
+                  {rating === 1 && "Poor"}
+                  {rating === 2 && "Fair"}
+                  {rating === 3 && "Good"}
+                  {rating === 4 && "Very Good"}
+                  {rating === 5 && "Excellent!"}
+                </p>
 
-                <div className="mb-3 p-3 bg-light rounded">
-                  <p className="d-flex align-items-center mb-0 text-secondary">
-                    <Utensils size={18} className="me-2" />
-                    {pickup.foodDetails}
-                  </p>
-                </div>
-
-                {pickup.submitted ? (
-                  <>
-                    <div className="d-flex align-items-center mb-2">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={20}
-                          className={
-                            i < pickup.rating
-                              ? "text-warning"
-                              : "text-secondary opacity-50"
-                          }
-                        />
-                      ))}
-                      <small className="ms-2 text-muted">
-                        {pickup.rating}.0 rating
-                      </small>
-                    </div>
-
-                    <div className="bg-success bg-opacity-10 p-3 rounded mb-3">
-                      <p className="mb-0">{pickup.feedback}</p>
-                    </div>
-
-                    <div className="d-flex justify-content-between align-items-center">
-                      <div className="btn-group" role="group">
-                        <button
-                          className="btn btn-outline-primary btn-sm"
-                          disabled={!pickup.editable}
-                        >
-                          Edit Feedback
-                        </button>
-                        <button
-                          className="btn btn-outline-danger btn-sm"
-                          onClick={() => openReportModal(pickup.id)}
-                        >
-                          Report Issue
-                        </button>
-                      </div>
-                      <div className="text-success d-flex align-items-center small fw-semibold">
-                        <Check size={16} className="me-1" />
-                        Submitted
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-3">
-                      <label className="form-label fw-semibold mb-2">
-                        Rate this pickup
-                      </label>
-                      <div className="d-flex gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => handleRatingChange(pickup.id, star)}
-                            className="btn p-0 border-0 bg-transparent"
-                            style={{ lineHeight: 0 }}
-                            aria-label={`Rate ${star} stars`}
-                          >
-                            <Star
-                              size={32}
-                              className={
-                                star <= pickup.rating
-                                  ? "text-warning"
-                                  : "text-secondary opacity-50"
-                              }
-                            />
-                          </button>
-                        ))}
-                      </div>
-                      <div className="d-flex justify-content-between small text-muted mt-1">
-                        <span>Poor</span> <span>Excellent</span>{" "}
-                      </div>{" "}
-                    </div>
-                    <div className="mb-3">
-                      <label
-                        htmlFor={`feedback-${pickup.id}`}
-                        className="form-label"
-                      >
-                        Your feedback
-                      </label>
-                      <textarea
-                        id={`feedback-${pickup.id}`}
-                        className="form-control"
-                        rows={3}
-                        value={pickup.feedback}
-                        onChange={(e) =>
-                          handleFeedbackChange(pickup.id, e.target.value)
-                        }
-                        placeholder="Share your experience..."
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      disabled={
-                        pickup.rating === 0 || pickup.feedback.trim() === ""
-                      }
-                      onClick={() => submitFeedback(pickup.id)}
-                    >
-                      Submit Feedback
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="alert alert-info text-center">
-            No {activeTab === "pending" ? "pending" : "submitted"} pickups.
-          </div>
-        )}
-
-        {/* Report Modal */}
-        {showReportModal && currentReport !== null && (
-          <div
-            className="modal fade show d-block"
-            tabIndex={-1}
-            aria-modal="true"
-            role="dialog"
-            onClick={() => setShowReportModal(false)}
-            style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-          >
-            <div
-              className="modal-dialog modal-dialog-centered"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">Report Issue</h5>
+                {/* Feedback Type Selection */}
+                <div className="flex gap-3">
                   <button
-                    type="button"
-                    className="btn-close"
-                    onClick={() => setShowReportModal(false)}
-                    aria-label="Close"
-                  ></button>
+                    className={`flex-1 p-4 rounded-xl border-2 transition-all ${
+                      feedbackType === "positive"
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() => setFeedbackType("positive")}
+                  >
+                    <ThumbsUp
+                      className={`w-6 h-6 mx-auto mb-2 ${
+                        feedbackType === "positive"
+                          ? "text-green-600"
+                          : "text-gray-400"
+                      }`}
+                    />
+                    <p className="text-sm font-medium">Positive</p>
+                  </button>
+                  <button
+                    className={`flex-1 p-4 rounded-xl border-2 transition-all ${
+                      feedbackType === "issue"
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() => setFeedbackType("issue")}
+                  >
+                    <AlertTriangle
+                      className={`w-6 h-6 mx-auto mb-2 ${
+                        feedbackType === "issue"
+                          ? "text-orange-600"
+                          : "text-gray-400"
+                      }`}
+                    />
+                    <p className="text-sm font-medium">Report Issue</p>
+                  </button>
                 </div>
-                <div className="modal-body">
-                  <p>
-                    You are reporting an issue for pickup ID:{" "}
-                    <b>{currentReport}</b>. Please describe the problem below.
+
+                {/* Quick Feedback Options */}
+                <div>
+                  <p className="text-sm text-gray-500 mb-3">Quick feedback</p>
+                  <div className="flex flex-wrap gap-2">
+                    {quickFeedback
+                      .filter((f) =>
+                        feedbackType === "positive"
+                          ? f.icon === ThumbsUp
+                          : feedbackType === "issue"
+                          ? f.icon === AlertTriangle
+                          : true
+                      )
+                      .map((item) => (
+                        <button
+                          key={item.label}
+                          className={`px-3 py-2 rounded-full text-sm transition-all ${
+                            feedback.includes(item.label)
+                              ? "bg-green-100 text-green-700 border-2 border-green-500"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                          onClick={() =>
+                            setFeedback(
+                              feedback.includes(item.label)
+                                ? feedback.replace(item.label + ". ", "")
+                                : feedback + item.label + ". "
+                            )
+                          }
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Additional Comments */}
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">
+                    Additional comments (optional)
                   </p>
                   <textarea
-                    className="form-control"
-                    rows={4}
-                    placeholder="Describe your issue..."
+                    className="w-full p-3 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                    rows={3}
+                    placeholder="Share your experience..."
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
                   />
                 </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowReportModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => setShowReportModal(false)}
-                  >
-                    Submit Report
-                  </button>
-                </div>
+
+                {/* Submit Button */}
+                <Button
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600"
+                  onClick={handleSubmitRating}
+                  disabled={!rating || isLoading}
+                >
+                  <Send className="w-5 h-5 mr-2" />
+                  Submit Feedback
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Tips Card */}
+        <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardContent className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <MessageSquare className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800">Why Feedback Matters</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Your feedback helps donors improve their listings and helps us
+                  maintain quality standards across the platform.
+                </p>
               </div>
             </div>
-          </div>
-        )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
-}
+};
+
+export default Feedback;
